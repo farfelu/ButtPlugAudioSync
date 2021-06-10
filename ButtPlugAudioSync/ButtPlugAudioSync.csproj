@@ -7,6 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Buttplug" Version="2.0.3" />
     <PackageReference Include="CSCore" Version="1.2.1.2" />
   </ItemGroup>
 

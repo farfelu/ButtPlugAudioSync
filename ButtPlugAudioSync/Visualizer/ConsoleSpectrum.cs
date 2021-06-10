@@ -18,7 +18,7 @@ namespace WinformsVisualization.Visualization
 
         private bool _hasMapped = false;
 
-        public float[] GetSpectrumPoints(float height, float[] fftBuffer)
+        public float[] GetSpectrumPoints(float height, float[] fftBuffer, float multiplier)
         {
             if (!_hasMapped)
             {
@@ -30,7 +30,7 @@ namespace WinformsVisualization.Visualization
             float[] res = new float[dats.Length];
             for (int i = 0; i < dats.Length; i++)
             {
-                res[i] = (float)dats[i].Value;
+                res[i] = (float)dats[i].Value * multiplier;
             }
 
             return res;

@@ -18,16 +18,14 @@ namespace ButtPlugAudioSync
 
         public float highScaleAverage = 10.0f;
         public float highScaleNotAverage = 12.0f;
-
-        ConsoleSpectrum spectrum;
-
-        WasapiCapture capture;
-        FftSize fftSize;
-        float[] fftBuffer;
-
-        BasicSpectrumProvider spectrumProvider;
-
-        IWaveSource finalSource;
+        
+        readonly ConsoleSpectrum spectrum;
+        readonly WasapiCapture capture;
+        readonly FftSize fftSize;
+        readonly BasicSpectrumProvider spectrumProvider;
+        readonly IWaveSource finalSource;
+        
+        private float[] fftBuffer;
 
         public SoundCapture()
         {
@@ -92,7 +90,7 @@ namespace ButtPlugAudioSync
 
         public float[] barData = new float[20];
 
-        public float[] GetFFtData()
+        public float[] GetFFtData(float multiplier)
         {
             if (spectrumProvider.IsNewDataAvailable)
             {
@@ -100,7 +98,7 @@ namespace ButtPlugAudioSync
                 spectrum.MaximumFrequency = maxFreq;
                 spectrum.IsXLogScale = logScale;
                 spectrum.SpectrumProvider.GetFftData(fftBuffer, this);
-                return spectrum.GetSpectrumPoints(100.0f, fftBuffer);
+                return spectrum.GetSpectrumPoints(100.0f, fftBuffer, multiplier);
             }
             else
             {
@@ -108,74 +106,97 @@ namespace ButtPlugAudioSync
             }
         }
 
-        public void ComputeData()
+        public float GetData(float multiplier, bool print)
         {
-            float[] resData = GetFFtData();
+            if (multiplier < 0.0f)
+            {
+                multiplier = 0;
+            }
+
+            float[] resData = GetFFtData(multiplier);
 
             if (resData == null)
             {
-                return;
+                return 0;
             }
 
-            lock (barData)
+            //lock (barData)
+            //{
+            //    for (int i = 0; i < barData.Length && i < resData.Length; i++)
+            //    {
+            //        // Make the data between 0.0 and 1.0
+            //        barData[i] = resData[i] / 100.0f;
+            //    }
+
+            //    for (int i = 0; i < barData.Length && i < resData.Length; i++)
+            //    {
+            //        if (spectrum.UseAverage)
+            //        {
+            //            // Scale the data because for some reason bass is always loud and treble is soft
+            //            barData[i] = barData[i] + highScaleAverage * (float)Math.Sqrt(i / (barData.Length + 0.0f)) * barData[i];
+            //        }
+            //        else
+            //        {
+            //            barData[i] = barData[i] + highScaleNotAverage * (float)Math.Sqrt(i / (barData.Length + 0.0f)) * barData[i];
+            //        }
+            //    }
+            //}
+
+            var arrayBassPart = resData.Length / 2;
+            float averageValue = resData.Select((value, index) => new { value, index }).Where(x => x.index < arrayBassPart).Average(x => x.value);
+
+            var normalized = Math.Clamp(averageValue / 10.0f, 0, 1);
+            normalized = normalized < 0.01f ? 0 : normalized;
+
+            if (print)
             {
-                //for (int i = 0; i < barData.Length && i < resData.Length; i++)
-                //{
-                //    // Make the data between 0.0 and 1.0
-                //    barData[i] = resData[i] / 100.0f;
-                //}
-
-                for (int i = 0; i < barData.Length && i < resData.Length; i++)
-                {
-                    if (spectrum.UseAverage)
-                    {
-                        // Scale the data because for some reason bass is always loud and treble is soft
-                        barData[i] = barData[i] + highScaleAverage * (float)Math.Sqrt(i / (barData.Length + 0.0f)) * barData[i];
-                    }
-                    else
-                    {
-                        barData[i] = barData[i] + highScaleNotAverage * (float)Math.Sqrt(i / (barData.Length + 0.0f)) * barData[i];
-                    }
-                }
+                PrintData(resData, averageValue, normalized, multiplier);
             }
 
-            PrintData(resData);
+
+            return normalized;
         }
 
-        private void PrintData(float[] dataCollection)
+        private static void PrintData(float[] dataCollection, float average, float normalized, float multiplier)
         {
             var yOffset = 2;
             for (var x = 0; x < dataCollection.Length; x++)
             {
-                var value = (int)Math.Floor(dataCollection[x]);
+                var value = dataCollection[x];
                 var xOffset = (x * 4) + 1;
                 for (var y = 0; y < 10; y++)
                 {
-                    var character = value >= (10 - y) ? "#" : " ";
+                    var character = value >= (10 - y) ? "##" : "  ";
 
-                    Console.SetCursorPosition(xOffset, y + yOffset);
-                    Console.Write(character);
-                    Console.SetCursorPosition(xOffset + 1, y + yOffset);
+                    Console.SetCursorPosition(xOffset, y + yOffset + 1);
                     Console.Write(character);
                 }
+
+                Console.SetCursorPosition(xOffset, yOffset);
+                Console.Write("--");
+                Console.SetCursorPosition(xOffset, 10 + yOffset + 1);
+                Console.Write("--");
             }
 
-
-            var arrayHalfSize = dataCollection.Length / 2;
-            int averageValue = (int)Math.Floor(dataCollection.Select((value, index) => new { value, index }).Where(x => x.index < arrayHalfSize).Average(x => x.value));
-
-            for (var x = 0; x < 4; x++)
             {
-                var xOffset = (dataCollection.Length * 4) + 10;
+                var xOffset = (dataCollection.Length * 4) + 5;
                 for (var y = 0; y < 10; y++)
                 {
-                    var character = averageValue >= (10 - y) ? "#" : " ";
+                    var character = average >= (10 - y) ? "#####" : "     ";
 
-                    Console.SetCursorPosition(x + xOffset, y + yOffset);
-                    Console.Write(character);
-                    Console.SetCursorPosition(x + xOffset, y + yOffset);
+                    Console.SetCursorPosition(xOffset, y + yOffset + 1);
                     Console.Write(character);
                 }
+
+                Console.SetCursorPosition(xOffset, yOffset);
+                Console.Write("-----");
+                Console.SetCursorPosition(xOffset, 10 + yOffset + 1);
+                Console.Write("-----");
+
+                Console.SetCursorPosition(xOffset + 6, 5 + yOffset + 1);
+                Console.Write("Intensity: {0:0.000}", normalized);
+                Console.SetCursorPosition(xOffset + 6, 5 + yOffset + 2);
+                Console.Write("Multiplier: {0:0.0}", multiplier);
             }
         }
     }
