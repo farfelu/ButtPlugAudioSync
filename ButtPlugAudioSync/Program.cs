@@ -54,7 +54,7 @@ namespace ButtPlugAudioSync
             {
                 Console.WriteLine("No devices available, exiting...");
                 await Task.Delay(2000);
-                //return;
+                return;
             }
 
             Console.WriteLine("Syncing audio, press escape to exit");
@@ -95,7 +95,38 @@ namespace ButtPlugAudioSync
                             case ConsoleKey.DownArrow:
                                 multiplier -= 0.1f;
                                 break;
+                            case ConsoleKey.Spacebar:
+                                PrintPaused();
+                                await SendAllDevices(0);
+
+                                while (true)
+                                {
+                                    if (Console.KeyAvailable)
+                                    {
+                                        var pausedKey = Console.ReadKey(true).Key;
+
+                                        if (pausedKey == ConsoleKey.Escape)
+                                        {
+                                            keepRunning = false;
+                                            break;
+                                        }
+                                        else if (pausedKey == ConsoleKey.Spacebar)
+                                        {
+                                            ClearGraph();
+                                            break;
+                                        }
+                                    }
+
+                                    await Task.Delay(10);
+                                }
+
+                                break;
                         }
+                    }
+
+                    if (!keepRunning)
+                    {
+                        break;
                     }
 
                     sw.Restart();
@@ -113,7 +144,7 @@ namespace ButtPlugAudioSync
 
                 Console.Clear();
                 Console.WriteLine("Exiting...");
-                await Task.Delay(4000);
+                await Task.Delay(2000);
                 return;
             }
             catch (ButtplugDeviceException)
@@ -124,11 +155,28 @@ namespace ButtPlugAudioSync
             }
         }
 
+        private static void ClearGraph()
+        {
+            for (var i = 0; i < 10; i++)
+            {
+                Console.SetCursorPosition(0, i + 3);
+                Console.Write(new string(' ', 90));
+            }
+        }
+
+        private static void PrintPaused()
+        {
+            ClearGraph();
+
+            Console.SetCursorPosition(33, 7);
+            Console.Write("P A U S E D");
+        }
+
 
         private static void Main()
         {
             RunAudioSync().Wait();
-            return;
+            Environment.Exit(0);
         }
     }
 }
